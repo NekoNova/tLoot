@@ -27,8 +27,10 @@ local ktDefaultSettings = {
 		nPatch = ktVersion.nPatch
 	},
 	tAnchorOffsets = {5, 446, 300, 480},
+	tOptionsWindowPos = {},
 	bAnchorVisible = true,
-	nBarUpdateSpeed = 0.2
+	nBarUpdateSpeed = 0.2,
+	bBottomToTop = false
 }
 
 local ktEvalColors = {
@@ -61,7 +63,7 @@ function TLoot:OnInitialize()
 	})
 	Logger:debug("Logger Initialized")
 	
-	self.settings = self:CopyTable(ktDefaultSettings)
+	self.settings = copyTable(ktDefaultSettings)
 	
 	self.xmlDoc = XmlDoc.CreateFromFile("TLoot.xml")
 	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
@@ -73,7 +75,7 @@ function TLoot:OnSave(eLevel)
 	end
 	Logger:debug("OnSaveSettings")
 	
-	self.settings.tVersion = self:CopyTable(tVersion)
+	self.settings.tVersion = copyTable(tVersion)
 	self.settings.tAnchorOffsets = {self.wndAnchor:GetAnchorOffsets()}
 	
 	return self.settings
@@ -82,11 +84,18 @@ end
 function TLoot:OnRestore(eLevel, tData)
 	Logger:debug("OnRestoreSettings")
 	if tData ~= nil then
-		self.settings = self:MergeTables(self.settings, tData)
+		self.settings = mergeTables(self.settings, tData)
 	end
 end
 
 function TLoot:OnSlashCommand(strCommand, strParam)
+	if strParam then
+		if strParam == "options" then
+			self:ToggleOptionsWindow()
+			
+			return
+		end
+	end
 	self:ToggleAnchor()
 end
 
@@ -536,35 +545,138 @@ function TLoot:CustomButtonOnMouseOut(wndHandler, wndControl)
 end
 
 -----------------------------------------------------------------------------------------------
+-- Options Functions
+-----------------------------------------------------------------------------------------------
+function TLoot:ToggleOptionsWindow()
+	self.bOptionsOpen = not self.bOptionsOpen
+	Logger:debug("OpenOptionsWindow (Open=%s", tostring(self.bOptionsOpen))
+	
+	if not self.wndOptions then
+		if not self.xmlDocOptions then
+			self.xmlDocOptions = XmlDoc.CreateFromFile("Options.xml")
+		end
+		self.wndOptions = Apollo.LoadForm(self.xmlDocOptions, "OptionsForm", nil, self)
+		self.wndOptionsList = Apollo.LoadForm(self.xmlDocOptions, "OptionsList", self.wndOptions:FindChild("ContentFrame"), self)
+	end
+	
+	if self.bOptionsOpen then
+		self:SetOptionValues()
+		self.wndOptions:ToFront()
+		local nScreenWidth, nScreenHeight = Apollo.GetScreenSize()
+		local nLeft, nTop, nRight, nBottom = self.wndOptions:GetRect()
+		local nWidth, nHeight = nRight - nLeft, nBottom - nTop
+		
+		if self.settings.tOptionsWindowPos[1] then
+			self.wndOptions:Move(round(nScreenWidth * self.settings.tOptionsWindowPos[1]), round(nScreenHeight * self.settings.tOptionsWindowPos[2]), nWidth, nHeight)
+		else
+			self.wndOptions:Move(round((nScreenWidth / 2) - (nWidth / 2)), round((nScreenHeight / 2) - (nHeight / 2)), nWidth, nHeight)
+		end
+	end
+	self.wndOptions:Show(self.bOptionsOpen, false)
+end
+
+function TLoot:OnOptionsWindowClosed(wndHandler, wndControl)
+	if wndHandler ~= wndControl then
+		return
+	end
+	self:ToggleOptionsWindow()
+end
+
+function TLoot:OnOptionsWindowHide(wndHandler, wndControl)
+	if wndHandler ~= wndControl then
+		return
+	end
+	if self.wndOptions then
+		self.wndOptionsList:Destroy()
+		self.wndOptionsList = nil
+		self.wndOptions:Destroy()
+		self.wndOptions = nil
+	end
+end
+
+function TLoot:OnOptionsWindowMove(wndHandler, wndControl, nOldLeft, nOldTop, nOldRight, nOldBottom)
+	local nScreenWidth, nScreenHeight = Apollo.GetScreenSize()
+	local nPosLeft, nPosTop = self.wndOptions:GetPos()
+	self.settings.tOptionsWindowPos[1], self.settings.tOptionsWindowPos[2] = nPosLeft / nScreenWidth, nPosTop / nScreenHeight
+end
+
+function TLoot:SetOptionValues()
+	Logger:debug("SetOptionValues")
+	
+	self.wndOptionsList:FindChild("UpdateSpeed"):FindChild("Slider"):SetValue(self.settings.nBarUpdateSpeed)
+	self.wndOptionsList:FindChild("UpdateSpeed"):FindChild("Value"):SetText(self.settings.nBarUpdateSpeed)
+	
+	self.wndOptionsList:FindChild("Direction"):FindChild("UpBtn"):SetCheck(not self.settings.bBottomToTop)
+	self.wndOptionsList:FindChild("Direction"):FindChild("DownBtn"):SetCheck(self.settings.bBottomToTop)
+end
+
+function TLoot:OnBarUpdateSpeedSliderChanged(wndHandler, wndControl, fNewValue, fOldValue)
+	if wndHandler ~= wndControl then
+		return
+	end
+	
+	self.settings.nBarUpdateSpeed = round(fNewValue, 1, true)
+	wndControl:GetParent():GetParent():FindChild("Value"):SetText(self.settings.nBarUpdateSpeed)
+	
+	-- Update timer
+	Apollo.CreateTimer("LootUpdateTimer", self.settings.nBarUpdateSpeed, false)
+	if not self.bTimerRunning then
+		Apollo.StopTimer("LootUpdateTimer")
+	end
+end
+
+function TLoot:OnBarUpdateSpeedTextChanged(wndHandler, wndControl, strText)
+	if wndHandler ~= wndControl then
+		return
+	end
+	
+	-- TODO: Error checking/boundaries
+	local value = tonumber(strText)
+	if not value or value < 0.1 then
+		value = 0.1
+	elseif value > 1.0 then
+		value = 1.0
+	end
+	self.settings.nBarUpdateSpeed = value
+	wndControl:GetParent():GetParent():FindChild("Slider"):SetValue(self.settings.nBarUpdateSpeed)
+	
+	-- Update timer
+	Apollo.CreateTimer("LootUpdateTimer", self.settings.nBarUpdateSpeed, false)
+	if not self.bTimerRunning then
+		Apollo.StopTimer("LootUpdateTimer")
+	end
+end
+
+-----------------------------------------------------------------------------------------------
 -- Helper Functions
 -----------------------------------------------------------------------------------------------
-function TLoot:CopyTable(orig)
+function copyTable(orig)
 	local orig_type = type(orig)
     local copy
     if orig_type == "table" then
         copy = {}
         for orig_key, orig_value in next, orig, nil do
-            copy[self:CopyTable(orig_key)] = self:CopyTable(orig_value)
+            copy[copyTable(orig_key)] = copyTable(orig_value)
         end
-        setmetatable(copy, self:CopyTable(getmetatable(orig)))
+        setmetatable(copy, copyTable(getmetatable(orig)))
     else
         copy = orig
     end
     return copy
 end
 
-function TLoot:MergeTables(t1, t2)
+function mergeTables(t1, t2)
     for k, v in pairs(t2) do
     	if type(v) == "table" then
 			if t1[k] then
 	    		if type(t1[k] or false) == "table" then
-	    			self:MergeTables(t1[k] or {}, t2[k] or {})
+	    			mergeTables(t1[k] or {}, t2[k] or {})
 	    		else
 	    			t1[k] = v
 	    		end
 			else
 				t1[k] = {}
-    			self:MergeTables(t1[k] or {}, t2[k] or {})
+    			mergeTables(t1[k] or {}, t2[k] or {})
 			end
     	else
     		t1[k] = v
@@ -573,7 +685,7 @@ function TLoot:MergeTables(t1, t2)
     return t1
 end
 
-function TLoot:Count(ht)
+function count(ht)
 	if not ht then
 		return 0
 	end
@@ -584,4 +696,14 @@ function TLoot:Count(ht)
 		end
 	end
 	return count
+end
+
+function round(n, nDecimals, bForceDecimals)
+	local nMult = 1
+	if nDecimals and nDecimals > 0 then
+		for i = 1, nDecimals do nMult = nMult * 10 end
+	end
+	n = math.floor((n * nMult) + 0.5) / nMult
+	if bForceDecimals then n = string.format("%." .. nDecimals .. "f", n) end
+	return n
 end
