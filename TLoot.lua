@@ -30,7 +30,8 @@ local ktDefaultSettings = {
 	tOptionsWindowPos = {},
 	bAnchorVisible = true,
 	nBarUpdateSpeed = 0.2,
-	bBottomToTop = false
+	bBottomToTop = false,
+	sLogLevel = "ERROR"
 }
 
 local ktEvalColors = {
@@ -57,7 +58,7 @@ local knLootRollTime = 60000
 function TLoot:OnInitialize()
 	local GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
 	Logger = GeminiLogging:GetLogger({
-		level = GeminiLogging.DEBUG,
+		level = GeminiLogging.ERROR,
 		pattern = "%d [%c:%n] %l - %m",
 		appender = "GeminiConsole"
 	})
@@ -85,6 +86,7 @@ function TLoot:OnRestore(eLevel, tData)
 	Logger:debug("OnRestoreSettings")
 	if tData ~= nil then
 		self.settings = mergeTables(self.settings, tData)
+		Logger:SetLevel(self.settings.sLogLevel)
 	end
 end
 
@@ -92,6 +94,11 @@ function TLoot:OnSlashCommand(strCommand, strParam)
 	if strParam then
 		if strParam == "options" then
 			self:ToggleOptionsWindow()
+			
+			return
+		elseif string.sub(strParam, 1, string.len("loglevel")) == "loglevel" then
+			self.settings.sLogLevel = string.upper(string.sub(strParam, string.len("loglevel") + 2))
+			Logger:SetLevel(self.settings.sLogLevel)
 			
 			return
 		end
@@ -179,7 +186,7 @@ function TLoot:GetLootWindowForRoll(tLootRoll)
 		
 		if data and data.nLootId and tLootRoll.nLootId == data.nLootId then
 			if wndItemContainer ~= nil then
-				Logger:error("GetLootWindowForRoll found multiple children with the same nLootId (%s)", tostring(tLootRoll.nLootId))
+				Logger:warn("GetLootWindowForRoll found multiple children with the same nLootId (%s)", tostring(tLootRoll.nLootId))
 			end
 			wndItemContainer = wndChild
 		end
@@ -195,7 +202,7 @@ function TLoot:GetLootWindowForItem(tItem)
 		
 		if data and data.itemDrop and data.itemDrop:GetName() == tItem:GetName() then
 			if wndItemContainer ~= nil then
-				Logger:error("GetLootWindowForItem found multiple children with the same name (%s)", tLootRoll:GetName())
+				Logger:warn("GetLootWindowForItem found multiple children with the same name (%s)", tLootRoll:GetName())
 			end
 			wndItemContainer = wndChild
 		end
@@ -408,7 +415,7 @@ function TLoot:OnLootRollAllPassed(tItem)
 		data.nTimeCompleted = os.time() -- TODO: Need ms
 		wndItemContainer:SetData(data)
 	else
-		Logger:error("Could not find loot window for item %s", tItem:GetName())
+		Logger:warn("Could not find loot window for item %s", tItem:GetName())
 	end
 	
 	ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Loot, String_GetWeaselString(Apollo.GetString("NeedVsGreed_EveryonePassed"), itemLooted:GetName()))
@@ -425,7 +432,7 @@ function TLoot:OnLootRollWon(tItem, sWinner, bNeed)
 		data.nTimeCompleted = os.time() -- TODO: Need ms
 		wndItemContainer:SetData(data)
 	else
-		Logger:error("Could not find loot window for item %s", tItem:GetName())
+		Logger:warn("Could not find loot window for item %s", tItem:GetName())
 	end
 	
 	-- Example Message: Alvin used Greed Roll on Item Name for 45 (LootRoll).
