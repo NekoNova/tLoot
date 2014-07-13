@@ -304,6 +304,12 @@ function TLoot:ResizeBar(wndItemContainer, nWidth, nHeight)
 		nHeight = (nBottom - nTop)
 	end
 	wndItemContainer:SetAnchorOffsets(nLeft, nTop, nLeft + nWidth, nTop + nHeight)
+	
+	local nLeft, nTop, nRight, nBottom = wndItemContainer:FindChild("IconFrame"):GetAnchorOffsets()
+	wndItemContainer:FindChild("IconFrame"):SetAnchorOffsets(nLeft, nTop, nLeft + (nHeight - 2), nBottom)
+	
+	local nLeft, nTop, nRight, nBottom = wndItemContainer:FindChild("BarFrame"):GetAnchorOffsets()
+	wndItemContainer:FindChild("BarFrame"):SetAnchorOffsets(nHeight - 4, nTop, nRight, nBottom)
 end
 
 -----------------------------------------------------------------------------------------------
@@ -373,7 +379,7 @@ function TLoot:DrawLoot(tLootRoll)
 		Logger:debug("New Container (Id=%s,N=%s)", tostring(tLootRoll.nLootId), tLootRoll.itemDrop:GetName())
 		bFirstRun = true
 		wndItemContainer = Apollo.LoadForm(self.xmlDoc, "ItemForm", wndAnchor, self)
-		self:ResizeBar(wndItemContainer, self.settings.nWidth, self.settings.nHeight)
+		self:ResizeBar(wndItemContainer, self.settings.nBarWidth, self.settings.nBarHeight)
 		wndAnchor:ArrangeChildrenVert()
 		wndAnchor:EnsureChildVisible(wndItemContainer)
 		Sound.Play(Sound.PlayUIWindowNeedVsGreedOpen)
