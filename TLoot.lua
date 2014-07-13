@@ -185,7 +185,7 @@ function TLoot:GetLootRolls()
 	local tRealLootRolls = GameLib.GetLootRolls()
 	if tRealLootRolls then
 		for idx, tItem in ipairs(tRealLootRolls) do
-			tAllLootRolls.insert(tItem)
+			table.insert(tAllLootRolls, tItem)
 		end
 	end
 	if self.tTestRolls then
