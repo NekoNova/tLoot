@@ -2,7 +2,8 @@
 -- Client Lua Script for TLoot
 -- Copyright (c) NCsoft. All rights reserved
 -----------------------------------------------------------------------------------------------
- 
+
+require "os"
 require "Window"
 require "Sound"
  
@@ -29,7 +30,7 @@ local ktDefaultSettings = {
 	tAnchorOffsets = {5, 446, 300, 480},
 	tOptionsWindowPos = {},
 	bAnchorVisible = true,
-	nBarUpdateSpeed = 0.2,
+	nBarUpdateSpeed = 0.5,
 	nBarHeight = 34,
 	nBarWidth = 295,
 	bBottomToTop = false,
@@ -76,6 +77,8 @@ function TLoot:OnInitialize()
 	Logger:debug("Logger Initialized")
 	
 	self.settings = copyTable(ktDefaultSettings)
+	self.nTestLootId = 1
+	self.nTestItemId = 1
 	
 	self.xmlDoc = XmlDoc.CreateFromFile("TLoot.xml")
 	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
@@ -147,6 +150,7 @@ function TLoot:OnDocLoaded()
 	Apollo.RegisterEventHandler("SystemKeyDown", "OnSystemKeyDown", self)
 	
 	self.tLootRolls = nil
+	self.tTestRolls = nil
 	self.tKnownLoot = nil
 	self.tRollData = {}
 	self.tCompletedRolls = {}
@@ -176,6 +180,25 @@ end
 -----------------------------------------------------------------------------------------------
 -- TLootForm Functions
 -----------------------------------------------------------------------------------------------
+function TLoot:GetLootRolls()
+	local tAllLootRolls = {}
+	local tRealLootRolls = GameLib.GetLootRolls()
+	if tRealLootRolls then
+		for idx, tItem in ipairs(tRealLootRolls) do
+			tAllLootRolls.insert(tItem)
+		end
+	end
+	if self.tTestRolls then
+		for id, tItem in pairs(self.tTestRolls) do
+			table.insert(tAllLootRolls, tItem)
+		end
+	else
+		return tRealLootRolls
+	end
+	
+	return tAllLootRolls
+end
+
 function TLoot:OnAnchorMove(wndHandler, wndControl, nOldLeft, nOldTop, nOldRight, nOldBottom)
 	self.settings.tAnchorOffsets = {self.wndAnchor:GetAnchorOffsets()}
 end
@@ -227,6 +250,9 @@ function TLoot:GetLootWindowForItem(tItem)
 end
 
 function TLoot:HelperBuildItemTooltip(wndArg, tItem, tModData, tGlyphData)
+	if tItem.bTest then
+		return
+	end
 	wndArg:SetTooltipDoc(nil)
 	wndArg:SetTooltipDocSecondary(nil)
 	local itemEquipped = tItem:GetEquippedItemForItemType()
@@ -241,6 +267,7 @@ function TLoot:RemoveCompletedRolls()
 			wndItemContainer:Destroy()
 		end
 	end
+	wndAnchor:ArrangeChildrenVert()
 end
 
 function TLoot:ResizeAllBars(nWidth, nHeight)
@@ -292,10 +319,11 @@ end
 
 function TLoot:UpdateKnownLoot()
 	Logger:debug("UpdateKnownLoot")
-	self.tLootRolls = GameLib.GetLootRolls()
+	self.tLootRolls = self:GetLootRolls()
 	if (not self.tLootRolls or #self.tLootRolls == 0) then
 		Logger:debug("No loot rolls")
 		self.tLootRolls = nil
+		self.tTestRolls = nil
 		self.tKnownLoot = nil
 		return
 	end
@@ -310,6 +338,7 @@ end
 
 function TLoot:OnUpdateTimer()
 	self:UpdateKnownLoot()
+	self:CountDownTestRolls()
 	
 	Logger:debug("OnUpdateTimer (%s rolls)", (self.tKnownLoot and tostring(#self.tKnownLoot) or "0"))
 	if self.tKnownLoot then
@@ -362,12 +391,7 @@ function TLoot:DrawLoot(tLootRoll)
 		wndItemContainer:FindChild("Name"):SetTextColor(itemQualityColor)
 		wndItemContainer:FindChild("IconFrame"):SetBGColor(itemQualityColor)
 		wndItemContainer:FindChild("BarFrame"):SetBGColor(itemQualityColor)
-		if wndItemContainer:FindChild("TimeRemainingBar").SetBarColor then
-			wndItemContainer:FindChild("TimeRemainingBar"):SetBarColor(itemQualityColor)
-		else
-			Logger:debug("Nope!!!!!!!!!!!!!!!!!!!!!!!!!")
-			Logger:debug(wndItemContainer:FindChild("TimeRemainingBar"))
-		end
+		wndItemContainer:FindChild("TimeRemainingBar"):SetBarColor(itemQualityColor)
 		wndItemContainer:FindChild("Icon"):SetSprite(itemCurrent:GetIcon())
 	
 		self:HelperBuildItemTooltip(wndItemContainer, itemCurrent, itemModData, tGlyphData)
@@ -377,7 +401,7 @@ function TLoot:DrawLoot(tLootRoll)
 	local btnGreed = wndItemContainer:FindChild("GreedBtn")
 	local btnPass = wndItemContainer:FindChild("PassBtn")
 	self:ToggleRollButtons(wndItemContainer,
-		(btnNeed:GetData() == nil or btnNeed:GetData() == true) and GameLib.IsNeedRollAllowed(tLootRoll.nLootId),
+		(btnNeed:GetData() == nil or btnNeed:GetData() == true) and (GameLib.IsNeedRollAllowed(tLootRoll.nLootId) or tLootRoll.bTestRoll),
 		(btnGreed:GetData() == nil or btnGreed:GetData() == true),
 		(btnPass:GetData() == nil or btnPass:GetData() == true)
 	)
@@ -476,7 +500,7 @@ function TLoot:OnLootRollAllPassed(tItem)
 	local wndItemContainer = self:GetLootWindowForItem(tItem)
 	if wndItemContainer ~= nil then
 		local data = wndItemContainer:GetData()
-		data.nTimeCompleted = os.time() -- TODO: Need ms
+		data.nTimeCompleted = os.clock()
 		wndItemContainer:SetData(data)
 	else
 		Logger:warn("Could not find loot window for item %s", tItem:GetName())
@@ -493,7 +517,7 @@ function TLoot:OnLootRollWon(tItem, sWinner, bNeed)
 	local wndItemContainer = self:GetLootWindowForItem(tItem)
 	if wndItemContainer ~= nil then
 		local data = wndItemContainer:GetData()
-		data.nTimeCompleted = os.time() -- TODO: Need ms
+		data.nTimeCompleted = os.clock()
 		wndItemContainer:SetData(data)
 	else
 		Logger:warn("Could not find loot window for item %s", tItem:GetName())
@@ -538,15 +562,19 @@ end
 function TLoot:Roll(wndItemContainer, nRollType)
 	local data = wndItemContainer:GetData()
 	
-	if nRollType == ktRollType["Need"] then
-		GameLib.RollOnLoot(data.nLootId, true)
-	elseif nRollType == ktRollType["Greed"] then
-		GameLib.RollOnLoot(data.nLootId, false)
-	elseif nRollType == ktRollType["Pass"] then
-		GameLib.PassOnLoot(data.nLootId)
+	if data.bTestRoll then
+		self.tTestRolls[data.nLootId] = nil
+	else
+		if nRollType == ktRollType["Need"] then
+			GameLib.RollOnLoot(data.nLootId, true)
+		elseif nRollType == ktRollType["Greed"] then
+			GameLib.RollOnLoot(data.nLootId, false)
+		elseif nRollType == ktRollType["Pass"] then
+			GameLib.PassOnLoot(data.nLootId)
+		end
 	end
 	
-	data.nTimeRolled = os.time() -- TODO: Need ms
+	data.nTimeRolled = os.clock()
 	self.tCompletedRolls[data.nLootId] = data
 	wndItemContainer:SetData(data)
 	self:ToggleRollButtons(wndItemContainer, false, false, false)
@@ -810,6 +838,117 @@ end
 
 function TLoot:OnPassKeybindEnableBtn(wndHandler, wndControl)
 	self.settings.bPassKeybind = wndHandler:IsChecked()
+end
+
+-----------------------------------------------------------------------------------------------
+-- Preview Functions
+-----------------------------------------------------------------------------------------------
+function TLoot:OnTestBtn()
+	local tTestLoot = {
+		nLootId = self.nTestLootId,
+		itemDrop = self:GetTestItem(),
+		tModData = {},
+		tSigilData = {},
+		nTimeLeft = 60000,
+		nLastUpdated = os.clock(),
+		bTestRoll = true
+	}
+	self.nTestLootId = self.nTestLootId + 1
+	
+	if not self.tTestRolls then
+		self.tTestRolls = {}
+	end
+	self.tTestRolls[tTestLoot.nLootId] = tTestLoot
+	
+	self:OnGroupLoot()
+end
+
+-- Returns a random equipped item, or a template one if nil
+function TLoot:GetTestItem()
+	local unitPlayer = GameLib.GetPlayerUnit()
+	local item = nil
+	if unitPlayer ~= nil then
+		local count = 0
+		local tItems = unitPlayer:GetEquippedItems()
+		
+		while item == nil and count < #tItems do
+			item = tItems[math.random(1, #tItems)]
+			local bFound = false
+			
+			if self.tTestRolls then
+				for id, tElement in pairs(self.tTestRolls) do
+					if tElement.itemDrop:GetItemId() == item:GetItemId() then
+						bFound = true
+					end
+				end
+			end
+			if self.tCompletedRolls then
+				for id, tElement in pairs(self.tCompletedRolls) do
+					if tElement.itemDrop:GetItemId() == item:GetItemId() then
+						bFound = true
+					end
+				end
+			end
+			
+			if bFound then
+				item = nil
+			end
+		end
+	end
+	
+	if item == nil then
+		item = {
+			id = self.nTestItemId,
+			name = "Test Item",
+			quality = math.random(1, #ktEvalColors),
+			icon = "IconSprites:Icon_CCStates_Stun"
+		}
+		self.nTestItemId = self.nTestItemId + 1
+		function item:GetItemId()
+			return self.id
+		end
+		function item:GetName()
+			return self.name
+		end
+		function item:GetItemQuality()
+			return self.quality
+		end
+		function item:GetIcon()
+			return self.icon
+		end
+	else
+		item = {
+			inner = item
+		}
+		function item:GetItemId()
+			return self.inner:GetItemId()
+		end
+		function item:GetName()
+			return self.inner:GetName()
+		end
+		function item:GetItemQuality()
+			return self.inner:GetItemQuality()
+		end
+		function item:GetIcon()
+			return self.inner:GetIcon()
+		end
+	end
+	
+	item.bTest = true
+	return item
+end
+
+function TLoot:CountDownTestRolls()
+	if self.tTestRolls then
+		for id, tItem in pairs(self.tTestRolls) do
+			local time = os.clock()
+			tItem.nTimeLeft = tItem.nTimeLeft - ((time - tItem.nLastUpdated) * 2000)
+			tItem.nLastUpdated = time
+			if tItem.nTimeLeft <= 0 then
+				self.tTestRolls[id] = nil
+			end
+		end
+	end
 end
 
 -----------------------------------------------------------------------------------------------
