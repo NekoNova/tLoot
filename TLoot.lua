@@ -33,6 +33,8 @@ local ktDefaultSettings = {
 	nBarHeight = 34,
 	nBarWidth = 295,
 	bBottomToTop = false,
+	nNeedKeybind = 78, nGreedKeybind = 71, nPassKeybind = 80,
+	bNeedKeybind = true, bGreedKeybind = true, bPassKeybind = false,
 	sLogLevel = "DEBUG"
 }
 
@@ -50,6 +52,13 @@ local ktRollType = {
 	["Need"] = 1,
 	["Greed"] = 2,
 	["Pass"] = 3
+}
+
+local ktKeys = {
+	[16] = "SHIFT", [17] = "CTRL",
+	[65] = "A", [66] = "B", [67] = "C", [68] = "D", [69] = "E", [70] = "F", [71] = "G", [72] = "H", [73] = "I", [74] = "J", [75] = "K", [76] = "L", [77] = "M",
+	[78] = "N", [79] = "O", [80] = "P", [81] = "Q", [82] = "R", [83] = "S", [84] = "T", [85] = "U", [86] = "V", [87] = "W", [88] = "X", [89] = "Y", [90] = "Z",
+	[96] = "0", [97] = "1", [98] = "2", [99] = "3", [100] = "4", [101] = "5", [102] = "6", [103] = "7", [104] = "8", [105] = "9"
 }
 
 local knLootRollTime = 60000
@@ -128,13 +137,14 @@ function TLoot:OnDocLoaded()
 	self.bTimerRunning = false
 	
 	self.wndAnchor = Apollo.LoadForm(self.xmlDoc, "AnchorForm", nil, self)
-	Logger:debug(self.settings.tAnchorOffsets)
 	self.wndAnchor:SetAnchorOffsets(unpack(self.settings.tAnchorOffsets))
 	self.wndAnchor:FindChild("Header"):Show(self.settings.bAnchorVisible)
 	
 	Apollo.RegisterSlashCommand("tLoot", "OnSlashCommand", self)
 	Apollo.RegisterSlashCommand("tloot", "OnSlashCommand", self)
 	Apollo.RegisterSlashCommand("tl", "OnSlashCommand", self)
+	
+	Apollo.RegisterEventHandler("SystemKeyDown", "OnSystemKeyDown", self)
 	
 	self.tLootRolls = nil
 	self.tKnownLoot = nil
@@ -247,6 +257,7 @@ function TLoot:ResizeAllBars(nWidth, nHeight)
 	end
 	
 	self:ResizeBar(self.wndAnchor, nWidth)
+	self.settings.tAnchorOffsets = {self.wndAnchor:GetAnchorOffsets()}
 	for idx, child in ipairs(children) do
 		self:ResizeBar(child, nWidth, nHeight)
 	end
@@ -513,21 +524,47 @@ end
 -----------------------------------------------------------------------------------------------
 -- Buttons
 -----------------------------------------------------------------------------------------------
+function TLoot:Roll(wndItemContainer, nRollType)
+	local data = wndItemContainer:GetData()
+	
+	if nRollType == ktRollType["Need"] then
+		GameLib.RollOnLoot(data.nLootId, true)
+	elseif nRollType == ktRollType["Greed"] then
+		GameLib.RollOnLoot(data.nLootId, false)
+	elseif nRollType == ktRollType["Pass"] then
+		GameLib.PassOnLoot(data.nLootId)
+	end
+	
+	data.nTimeRolled = os.time() -- TODO: Need ms
+	self.tCompletedRolls[data.nLootId] = data
+	wndItemContainer:SetData(data)
+	self:ToggleRollButtons(wndItemContainer, false, false, false)
+	
+	wndItemContainer:Destroy()
+end
+
+function TLoot:OnSystemKeyDown(nKey)
+	local children = self.wndAnchor:FindChild("Anchor"):GetChildren()
+	
+	if #children > 0 then
+		local wndItemContainer = children[1]
+		if self.settings.bNeedKeybind and nKey == self.settings.nNeedKeybind and not wndItemContainer:FindChild("NeedBtn"):FindChild("DisableMask"):IsVisible() then
+			self:Roll(children[1], ktRollType["Need"])
+		elseif self.settings.bGreedKeybind and nKey == self.settings.nGreedKeybind and not wndItemContainer:FindChild("GreedBtn"):FindChild("DisableMask"):IsVisible() then
+			self:Roll(children[1], ktRollType["Greed"])
+		elseif self.settings.bPassKeybind and nKey == self.settings.nPassKeybind and not wndItemContainer:FindChild("PassBtn"):FindChild("DisableMask"):IsVisible() then
+			self:Roll(children[1], ktRollType["Pass"])
+		end
+	end
+end
+
 function TLoot:OnNeedBtn(wndHandler, wndControl)
 	Logger:debug("OnNeedBtn")
 	local wndItemContainer = wndHandler:GetParent():GetParent():GetParent()
 	local data = wndItemContainer:GetData()
 	
 	if data and data.nLootId then
-		data.nTimeRolled = os.time() -- TODO: Need ms
-		self.tCompletedRolls[data.nLootId] = data
-		
-		GameLib.RollOnLoot(data.nLootId, true)
-		
-		wndItemContainer:SetData(data)
-		self:ToggleRollButtons(wndItemContainer, false, false, false)
-		
-		wndItemContainer:Destroy() -- TODO: Keep around
+		self:Roll(wndItemContainer, ktRollType["Need"])
 	else
 		Logger:debug("No data to roll on")
 	end
@@ -539,15 +576,7 @@ function TLoot:OnGreedBtn(wndHandler, wndControl)
 	local data = wndItemContainer:GetData()
 	
 	if data and data.nLootId then
-		data.nTimeRolled = os.time() -- TODO: Need ms
-		self.tCompletedRolls[data.nLootId] = data
-		
-		GameLib.RollOnLoot(data.nLootId, false)
-		
-		wndItemContainer:SetData(data)
-		self:ToggleRollButtons(wndItemContainer, false, false, false)
-		
-		wndItemContainer:Destroy() -- TODO: Keep around
+		self:Roll(wndItemContainer, ktRollType["Greed"])
 	else
 		Logger:debug("No data to roll on")
 	end
@@ -559,15 +588,7 @@ function TLoot:OnPassBtn(wndHandler, wndControl)
 	local data = wndItemContainer:GetData()
 	
 	if data and data.nLootId then
-		data.nTimeRolled = os.time() -- TODO: Need ms
-		self.tCompletedRolls[data.nLootId] = data
-		
-		GameLib.PassOnLoot(data.nLootId)
-		
-		wndItemContainer:SetData(data)
-		self:ToggleRollButtons(wndItemContainer, false, false, false)
-		
-		wndItemContainer:Destroy() -- TODO: Keep around
+		self:Roll(wndItemContainer, ktRollType["Pass"])
 	else
 		Logger:debug("No data to roll on")
 	end
@@ -598,7 +619,7 @@ end
 -----------------------------------------------------------------------------------------------
 function TLoot:ToggleOptionsWindow()
 	self.bOptionsOpen = not self.bOptionsOpen
-	Logger:debug("OpenOptionsWindow (Open=%s", tostring(self.bOptionsOpen))
+	Logger:debug("ToggleOptionsWindow (Open=%s)", tostring(self.bOptionsOpen))
 	
 	if not self.wndOptions then
 		if not self.xmlDocOptions then
@@ -661,6 +682,13 @@ function TLoot:SetOptionValues()
 	
 	self.wndOptionsList:FindChild("Direction"):FindChild("UpBtn"):SetCheck(not self.settings.bBottomToTop)
 	self.wndOptionsList:FindChild("Direction"):FindChild("DownBtn"):SetCheck(self.settings.bBottomToTop)
+	
+	self.wndOptionsList:FindChild("NeedKeybind"):FindChild("InputBox"):SetText(ktKeys[self.settings.nNeedKeybind])
+	self.wndOptionsList:FindChild("NeedKeybind"):FindChild("EnableBtn"):SetCheck(self.settings.bNeedKeybind)
+	self.wndOptionsList:FindChild("GreedKeybind"):FindChild("InputBox"):SetText(ktKeys[self.settings.nGreedKeybind])
+	self.wndOptionsList:FindChild("GreedKeybind"):FindChild("EnableBtn"):SetCheck(self.settings.bGreedKeybind)
+	self.wndOptionsList:FindChild("PassKeybind"):FindChild("InputBox"):SetText(ktKeys[self.settings.nPassKeybind])
+	self.wndOptionsList:FindChild("PassKeybind"):FindChild("EnableBtn"):SetCheck(self.settings.bPassKeybind)
 end
 
 function TLoot:OnBarUpdateSpeedSliderChanged(wndHandler, wndControl, fNewValue, fOldValue)
@@ -717,6 +745,60 @@ function TLoot:OnResetBtn(wndHandler, wndControl)
 	
 	self.settings = copyTable(ktDefaultSettings)
 	RequestReloadUI()
+end
+
+function TLoot:OnNeedKeybindChanged(wndHandler, wndControl, sText)
+	local sKey = string.upper(string.sub(sText, 1, 2))
+	local nKey = getKey(ktKeys, sKey)
+	
+	if nKey ~= nil then
+		self.settings.nNeedKeybind = nKey
+	else
+		sKey = ktKeys[self.settings.nNeedKeybind]
+	end
+	
+	wndHandler:SetText(sKey)
+	wndHandler:ClearFocus()
+end
+
+function TLoot:OnGreedKeybindChanged(wndHandler, wndControl, sText)
+	local sKey = string.upper(string.sub(sText, 1, 2))
+	local nKey = getKey(ktKeys, sKey)
+	
+	if nKey ~= nil then
+		self.settings.nGreedKeybind = nKey
+	else
+		sKey = ktKeys[self.settings.nGreedKeybind]
+	end
+	
+	wndHandler:SetText(sKey)
+	wndHandler:ClearFocus()
+end
+
+function TLoot:OnPassKeybindChanged(wndHandler, wndControl, sText)
+	local sKey = string.upper(string.sub(sText, 1, 2))
+	local nKey = getKey(ktKeys, sKey)
+	
+	if nKey ~= nil then
+		self.settings.nPassKeybind = nKey
+	else
+		sKey = ktKeys[self.settings.nPassKeybind]
+	end
+	
+	wndHandler:SetText(sKey)
+	wndHandler:ClearFocus()
+end
+
+function TLoot:OnNeedKeybindEnableBtn(wndHandler, wndControl)
+	self.settings.bNeedKeybind = wndHandler:IsChecked()
+end
+
+function TLoot:OnGreedKeybindEnableBtn(wndHandler, wndControl)
+	self.settings.bGreedKeybind = wndHandler:IsChecked()
+end
+
+function TLoot:OnPassKeybindEnableBtn(wndHandler, wndControl)
+	self.settings.bPassKeybind = wndHandler:IsChecked()
 end
 
 -----------------------------------------------------------------------------------------------
@@ -778,4 +860,13 @@ function round(n, nDecimals, bForceDecimals)
 	n = math.floor((n * nMult) + 0.5) / nMult
 	if bForceDecimals then n = string.format("%." .. nDecimals .. "f", n) end
 	return n
+end
+
+function getKey(tTable, item)
+	for key, value in pairs(tTable) do
+		if value == item then
+			return key
+		end
+	end
+	return nil
 end
