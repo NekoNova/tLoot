@@ -433,13 +433,13 @@ function TLoot:DrawLoot(tLootRoll)
 		end
 		
 		if needTooltip ~= "" then
-			needTooltip = "<P>------</P>" .. needToolTip
+			needTooltip = "<P>------</P>" .. needTooltip
 		end
 		if greedTooltip ~= "" then
-			greedTooltip = "<P>------</P>" .. greedToolTip
+			greedTooltip = "<P>------</P>" .. greedTooltip
 		end
 		if passTooltip ~= "" then
-			passTooltip = "<P>------</P>" .. passToolTip
+			passTooltip = "<P>------</P>" .. passTooltip
 		end
 	end
 	needTooltip = "<P>" .. Apollo.GetString("CRB_Need") .. "</P>" .. needTooltip
