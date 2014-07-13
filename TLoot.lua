@@ -30,8 +30,10 @@ local ktDefaultSettings = {
 	tOptionsWindowPos = {},
 	bAnchorVisible = true,
 	nBarUpdateSpeed = 0.2,
+	nBarHeight = 34,
+	nBarWidth = 295,
 	bBottomToTop = false,
-	sLogLevel = "ERROR"
+	sLogLevel = "DEBUG"
 }
 
 local ktEvalColors = {
@@ -77,7 +79,6 @@ function TLoot:OnSave(eLevel)
 	Logger:debug("OnSaveSettings")
 	
 	self.settings.tVersion = copyTable(tVersion)
-	self.settings.tAnchorOffsets = {self.wndAnchor:GetAnchorOffsets()}
 	
 	return self.settings
 end
@@ -127,6 +128,7 @@ function TLoot:OnDocLoaded()
 	self.bTimerRunning = false
 	
 	self.wndAnchor = Apollo.LoadForm(self.xmlDoc, "AnchorForm", nil, self)
+	Logger:debug(self.settings.tAnchorOffsets)
 	self.wndAnchor:SetAnchorOffsets(unpack(self.settings.tAnchorOffsets))
 	self.wndAnchor:FindChild("Header"):Show(self.settings.bAnchorVisible)
 	
@@ -164,6 +166,10 @@ end
 -----------------------------------------------------------------------------------------------
 -- TLootForm Functions
 -----------------------------------------------------------------------------------------------
+function TLoot:OnAnchorMove(wndHandler, wndControl, nOldLeft, nOldTop, nOldRight, nOldBottom)
+	self.settings.tAnchorOffsets = {self.wndAnchor:GetAnchorOffsets()}
+end
+
 function TLoot:ToggleRollButtons(wndItemContainer, bNeed, bGreed, bPass)
 	Logger:debug("ToggleRollButtons (N=%s,G=%s,P=%s)", tostring(bNeed), tostring(bGreed), tostring(bPass))
 	local needBtn = wndItemContainer:FindChild("NeedBtn")
@@ -225,6 +231,41 @@ function TLoot:RemoveCompletedRolls()
 			wndItemContainer:Destroy()
 		end
 	end
+end
+
+function TLoot:ResizeAllBars(nWidth, nHeight)
+	if not self.wndAnchor then
+		return
+	end
+	local wndAnchor = self.wndAnchor:FindChild("Anchor")
+	if not wndAnchor then
+		return
+	end
+	local children = wndAnchor:GetChildren()
+	if not children then
+		return
+	end
+	
+	self:ResizeBar(self.wndAnchor, nWidth)
+	for idx, child in ipairs(children) do
+		self:ResizeBar(child, nWidth, nHeight)
+	end
+	wndAnchor:ArrangeChildrenVert()
+end
+
+function TLoot:ResizeBar(wndItemContainer, nWidth, nHeight)
+	if not wndItemContainer then
+		return
+	end
+	
+	local nLeft, nTop, nRight, nBottom = wndItemContainer:GetAnchorOffsets()
+	if nWidth == nil then
+		nWidth = (nRight - nLeft)
+	end
+	if nHeight == nil then
+		nHeight = (nBottom - nTop)
+	end
+	wndItemContainer:SetAnchorOffsets(nLeft, nTop, nLeft + nWidth, nTop + nHeight)
 end
 
 -----------------------------------------------------------------------------------------------
@@ -292,6 +333,7 @@ function TLoot:DrawLoot(tLootRoll)
 		Logger:debug("New Container (Id=%s,N=%s)", tostring(tLootRoll.nLootId), tLootRoll.itemDrop:GetName())
 		bFirstRun = true
 		wndItemContainer = Apollo.LoadForm(self.xmlDoc, "ItemForm", wndAnchor, self)
+		self:ResizeBar(wndItemContainer, self.settings.nWidth, self.settings.nHeight)
 		wndAnchor:ArrangeChildrenVert()
 		wndAnchor:EnsureChildVisible(wndItemContainer)
 		Sound.Play(Sound.PlayUIWindowNeedVsGreedOpen)
@@ -612,6 +654,10 @@ function TLoot:SetOptionValues()
 	
 	self.wndOptionsList:FindChild("UpdateSpeed"):FindChild("Slider"):SetValue(self.settings.nBarUpdateSpeed)
 	self.wndOptionsList:FindChild("UpdateSpeed"):FindChild("Value"):SetText(self.settings.nBarUpdateSpeed)
+	self.wndOptionsList:FindChild("BarWidth"):FindChild("Slider"):SetValue(self.settings.nBarWidth)
+	self.wndOptionsList:FindChild("BarWidth"):FindChild("Value"):SetText(self.settings.nBarWidth)
+	self.wndOptionsList:FindChild("BarHeight"):FindChild("Slider"):SetValue(self.settings.nBarHeight)
+	self.wndOptionsList:FindChild("BarHeight"):FindChild("Value"):SetText(self.settings.nBarHeight)
 	
 	self.wndOptionsList:FindChild("Direction"):FindChild("UpBtn"):SetCheck(not self.settings.bBottomToTop)
 	self.wndOptionsList:FindChild("Direction"):FindChild("DownBtn"):SetCheck(self.settings.bBottomToTop)
@@ -632,26 +678,45 @@ function TLoot:OnBarUpdateSpeedSliderChanged(wndHandler, wndControl, fNewValue, 
 	end
 end
 
-function TLoot:OnBarUpdateSpeedTextChanged(wndHandler, wndControl, strText)
+function TLoot:OnBarWidthSliderChanged(wndHandler, wndControl, fNewValue, fOldValue)
 	if wndHandler ~= wndControl then
 		return
 	end
 	
-	-- TODO: Error checking/boundaries
-	local value = tonumber(strText)
-	if not value or value < 0.1 then
-		value = 0.1
-	elseif value > 1.0 then
-		value = 1.0
-	end
-	self.settings.nBarUpdateSpeed = value
-	wndControl:GetParent():GetParent():FindChild("Slider"):SetValue(self.settings.nBarUpdateSpeed)
+	self.settings.nBarWidth = round(fNewValue, 0, true)
+	wndControl:GetParent():GetParent():FindChild("Value"):SetText(self.settings.nBarWidth)
 	
-	-- Update timer
-	Apollo.CreateTimer("LootUpdateTimer", self.settings.nBarUpdateSpeed, false)
-	if not self.bTimerRunning then
-		Apollo.StopTimer("LootUpdateTimer")
+	-- Update existing bars
+	self:ResizeAllBars(self.settings.nBarWidth, self.settings.nBarHeight)
+end
+
+function TLoot:OnBarHeightSliderChanged(wndHandler, wndControl, fNewValue, fOldValue)
+	if wndHandler ~= wndControl then
+		return
 	end
+	
+	self.settings.nBarHeight = round(fNewValue, 0, true)
+	wndControl:GetParent():GetParent():FindChild("Value"):SetText(self.settings.nBarHeight)
+	
+	-- Update existing bars
+	self:ResizeAllBars(self.settings.nBarWidth, self.settings.nBarHeight)
+end
+
+function TLoot:OnReloadBtn(wndHandler, wndControl)
+	if wndHandler ~= wndControl then
+		return
+	end
+	
+	RequestReloadUI()
+end
+
+function TLoot:OnResetBtn(wndHandler, wndControl)
+	if wndHandler ~= wndControl then
+		return
+	end
+	
+	self.settings = copyTable(ktDefaultSettings)
+	RequestReloadUI()
 end
 
 -----------------------------------------------------------------------------------------------
