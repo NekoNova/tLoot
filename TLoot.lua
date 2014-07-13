@@ -383,9 +383,7 @@ function TLoot:DrawLoot(tLootRoll)
 	)
 	
 	local needCount, greedCount, passCount = 0, 0, 0
-	local needTooltip = "<P>" .. Apollo.GetString("CRB_Need") .. "</P>"
-	local greedTooltip = "<P>" .. Apollo.GetString("CRB_Greed") .. "</P>"
-	local passTooltip = "<P>" .. Apollo.GetString("CRB_Pass") .. "</P>"
+	local needTooltip, greedTooltip, passTooltip = "", "", ""
 	if self.tRollData and self.tRollData[itemCurrent:GetItemId()] then
 		local tItemRoll = self.tRollData[itemCurrent:GetItemId()]
 		for player, rolltype in pairs(tItemRoll.players) do
@@ -403,7 +401,20 @@ function TLoot:DrawLoot(tLootRoll)
 				passTooltip = passTooltip .. sTooltip
 			end
 		end
+		
+		if needTooltip ~= "" then
+			needTooltip = "<P>------</P>" .. needToolTip
+		end
+		if greedTooltip ~= "" then
+			greedTooltip = "<P>------</P>" .. greedToolTip
+		end
+		if passTooltip ~= "" then
+			passTooltip = "<P>------</P>" .. passToolTip
+		end
 	end
+	needTooltip = "<P>" .. Apollo.GetString("CRB_Need") .. "</P>" .. needTooltip
+	greedTooltip = "<P>" .. Apollo.GetString("CRB_Greed") .. "</P>" .. greedTooltip
+	passTooltip = "<P>" .. Apollo.GetString("CRB_Pass") .. "</P>" .. passTooltip
 	btnNeed:SetText(needCount)
 	btnNeed:SetTooltip(needTooltip)
 	btnGreed:SetText(greedCount)
