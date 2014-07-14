@@ -19,7 +19,7 @@ local Logger
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local ktVersion = {nMajor = 1, nMinor = 0, nPatch = 0}
+local ktVersion = {nMajor = 1, nMinor = 0, nPatch = 1}
 
 local ktDefaultSettings = {
 	tVersion = {
@@ -36,7 +36,7 @@ local ktDefaultSettings = {
 	bBottomToTop = false,
 	nNeedKeybind = 78, nGreedKeybind = 71, nPassKeybind = 80,
 	bNeedKeybind = true, bGreedKeybind = true, bPassKeybind = false,
-	sLogLevel = "DEBUG"
+	sLogLevel = "ERROR"
 }
 
 local ktEvalColors = {
@@ -97,6 +97,12 @@ function TLoot:OnRestore(eLevel, tData)
 	Logger:debug("OnRestoreSettings")
 	if tData ~= nil then
 		self.settings = mergeTables(self.settings, tData)
+		
+		if self.settings.tVersion.nPatch == 0 then
+			-- Mistakenly kept loglevel on DEBUG for version 0
+			self.settings.sLogLevel = "ERROR"	
+		end
+		
 		Logger:SetLevel(self.settings.sLogLevel)
 	end
 end
