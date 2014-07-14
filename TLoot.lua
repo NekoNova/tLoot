@@ -61,8 +61,6 @@ local ktKeys = {
 	[78] = "N", [79] = "O", [80] = "P", [81] = "Q", [82] = "R", [83] = "S", [84] = "T", [85] = "U", [86] = "V", [87] = "W", [88] = "X", [89] = "Y", [90] = "Z",
 	[96] = "0", [97] = "1", [98] = "2", [99] = "3", [100] = "4", [101] = "5", [102] = "6", [103] = "7", [104] = "8", [105] = "9"
 }
-
-local knLootRollTime = 60000
  
 -----------------------------------------------------------------------------------------------
 -- Initialization
@@ -154,6 +152,7 @@ function TLoot:OnDocLoaded()
 	self.tKnownLoot = nil
 	self.tRollData = {}
 	self.tCompletedRolls = {}
+	self.tLootMaxTimes = {} -- This is a separate table because we're resetting the others each update
 	
 	if GameLib.GetLootRolls() then
 		self:OnGroupLoot()
@@ -185,11 +184,17 @@ function TLoot:GetLootRolls()
 	local tRealLootRolls = GameLib.GetLootRolls()
 	if tRealLootRolls then
 		for idx, tItem in ipairs(tRealLootRolls) do
+			if not self.tLootMaxTimes[tItem.nLootId] or self.tLootMaxTimes[tItem.nLootId] < tItem.nTimeLeft then
+				self.tLootMaxTimes[tItem.nLootId] = tItem.nTimeLeft
+			end
 			table.insert(tAllLootRolls, tItem)
 		end
 	end
 	if self.tTestRolls then
 		for id, tItem in pairs(self.tTestRolls) do
+			if not self.tLootMaxTimes[tItem.nLootId] or self.tLootMaxTimes[tItem.nLootId] < tItem.nTimeLeft then
+				self.tLootMaxTimes[tItem.nLootId] = tItem.nTimeLeft
+			end
 			table.insert(tAllLootRolls, tItem)
 		end
 	else
@@ -451,11 +456,8 @@ function TLoot:DrawLoot(tLootRoll)
 	btnGreed:SetTooltip(greedTooltip)
 	btnPass:SetText(passCount)
 	btnPass:SetTooltip(passTooltip)
-	
-	if tLootRoll.nTimeLeft > knLootRollTime then
-		knLootRollTime = tLootRoll.nTimeLeft
-	end
-	self:SetBarValue(wndItemContainer:FindChild("TimeRemainingBar"), 0, tLootRoll.nTimeLeft, knLootRollTime)
+
+	self:SetBarValue(wndItemContainer:FindChild("TimeRemainingBar"), 0, tLootRoll.nTimeLeft, self.tLootMaxTimes[tLootRoll.nLootId])
 end
 
 -----------------------------------------------------------------------------------------------
