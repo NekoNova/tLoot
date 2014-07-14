@@ -241,7 +241,7 @@ function TLoot:GetLootWindowForItem(tItem)
 		
 		if data and data.itemDrop and data.itemDrop:GetName() == tItem:GetName() then
 			if wndItemContainer ~= nil then
-				Logger:warn("GetLootWindowForItem found multiple children with the same name (%s)", tLootRoll:GetName())
+				Logger:warn("GetLootWindowForItem found multiple children with the same name (%s)", tItem:GetName())
 			end
 			wndItemContainer = wndChild
 		end
