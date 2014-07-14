@@ -96,12 +96,12 @@ end
 function TLoot:OnRestore(eLevel, tData)
 	Logger:debug("OnRestoreSettings")
 	if tData ~= nil then
-		self.settings = mergeTables(self.settings, tData)
-		
 		if self.settings.tVersion.nPatch == 0 then
 			-- Mistakenly kept loglevel on DEBUG for version 0
 			self.settings.sLogLevel = "ERROR"	
 		end
+		
+		self.settings = mergeTables(self.settings, tData)
 		
 		Logger:SetLevel(self.settings.sLogLevel)
 	end
