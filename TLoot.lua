@@ -172,6 +172,8 @@ function TLoot:ToggleAnchor()
 	if self.wndAnchor then
 		self.settings.bAnchorVisible = not self.settings.bAnchorVisible
 		self.wndAnchor:FindChild("Header"):Show(self.settings.bAnchorVisible)
+		self.wndAnchor:SetStyle("IgnoreMouse", not self.settings.bAnchorVisible)
+		self.wndAnchor:SetStyle("Moveable", self.settings.bAnchorVisible)
 	end
 end
 
