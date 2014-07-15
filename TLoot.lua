@@ -316,11 +316,17 @@ function TLoot:ResizeBar(wndItemContainer, nWidth, nHeight)
 	end
 	wndItemContainer:SetAnchorOffsets(nLeft, nTop, nLeft + nWidth, nTop + nHeight)
 	
-	local nLeft, nTop, nRight, nBottom = wndItemContainer:FindChild("IconFrame"):GetAnchorOffsets()
-	wndItemContainer:FindChild("IconFrame"):SetAnchorOffsets(nLeft, nTop, nLeft + (nHeight - 2), nBottom)
+	local wndIconFrame = wndItemContainer:FindChild("IconFrame")
+	if wndIconFrame ~= nil then
+		local nLeft, nTop, nRight, nBottom = wndIconFrame:GetAnchorOffsets()
+		wndIconFrame:SetAnchorOffsets(nLeft, nTop, nLeft + (nHeight - 2), nBottom)
+	end
 	
-	local nLeft, nTop, nRight, nBottom = wndItemContainer:FindChild("BarFrame"):GetAnchorOffsets()
-	wndItemContainer:FindChild("BarFrame"):SetAnchorOffsets(nHeight - 4, nTop, nRight, nBottom)
+	local wndBarFrame = wndItemContainer:FindChild("BarFrame")
+	if wndBarFrame ~= nil then
+		local nLeft, nTop, nRight, nBottom = wndBarFrame:GetAnchorOffsets()
+		wndBarFrame:SetAnchorOffsets(nHeight - 4, nTop, nRight, nBottom)
+	end
 end
 
 -----------------------------------------------------------------------------------------------
