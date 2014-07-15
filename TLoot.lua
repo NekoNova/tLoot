@@ -19,7 +19,7 @@ local Logger
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local ktVersion = {nMajor = 1, nMinor = 0, nPatch = 2}
+local ktVersion = {nMajor = 1, nMinor = 0, nPatch = 3}
 
 local ktDefaultSettings = {
 	tVersion = {
@@ -149,6 +149,7 @@ function TLoot:OnDocLoaded()
 	
 	Apollo.RegisterSlashCommand("tLoot", "OnSlashCommand", self)
 	Apollo.RegisterSlashCommand("tloot", "OnSlashCommand", self)
+	Apollo.RegisterSlashCommand("TLoot", "OnSlashCommand", self)
 	Apollo.RegisterSlashCommand("tl", "OnSlashCommand", self)
 	
 	Apollo.RegisterEventHandler("SystemKeyDown", "OnSystemKeyDown", self)
@@ -472,6 +473,22 @@ function TLoot:DrawLoot(tLootRoll)
 	btnPass:SetTooltip(passTooltip)
 
 	self:SetBarValue(wndItemContainer:FindChild("TimeRemainingBar"), 0, tLootRoll.nTimeLeft, self.tLootMaxTimes[tLootRoll.nLootId])
+end
+
+function TLoot:OnItemWindowMouseButtonUp(wndHandler, wndControl, eMouseButton, nLastRelativeMouseX, nLastRelativeMouseY)
+	-- Item previewing
+	if Apollo.IsControlKeyDown() and eMouseButton == GameLib.CodeEnumInputMouse.Right then
+		local data = wndHandler:GetData()
+		if data and data.itemDrop and not data.itemDrop.bTest then
+			local nDecorId = data.itemDrop:GetHousingDecorInfoId()
+			if nDecorId ~= nil and nDecorId ~= 0 then
+				Event_FireGenericEvent("DecorPreviewOpen", nDecorId)
+			else
+				Event_FireGenericEvent("ShowItemInDressingRoom", data.itemDrop)
+				--self:OnShowItemInDressingRoom(data.itemDrop)
+			end
+		end
+	end
 end
 
 -----------------------------------------------------------------------------------------------
@@ -938,25 +955,11 @@ function TLoot:GetTestItem()
 		function item:GetIcon()
 			return self.icon
 		end
-	else
-		item = {
-			inner = item
-		}
-		function item:GetItemId()
-			return self.inner:GetItemId()
-		end
-		function item:GetName()
-			return self.inner:GetName()
-		end
-		function item:GetItemQuality()
-			return self.inner:GetItemQuality()
-		end
-		function item:GetIcon()
-			return self.inner:GetIcon()
-		end
+		
+		item.bTest = true
 	end
 	
-	item.bTest = true
+	
 	return item
 end
 
