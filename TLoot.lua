@@ -88,17 +88,16 @@ function TLoot:OnSave(eLevel)
 	end
 	Logger:debug("OnSaveSettings")
 	
-	self.settings.tVersion = copyTable(tVersion)
+	self.settings.tVersion = copyTable(ktVersion)
 	
 	return self.settings
 end
 
 function TLoot:OnRestore(eLevel, tData)
-	Logger:debug("OnRestoreSettings")
 	if tData ~= nil then
-		if self.settings.tVersion.nPatch == 0 then
-			-- Mistakenly kept loglevel on DEBUG for version 0
-			self.settings.sLogLevel = "ERROR"	
+		if not tData.tVersion or (tData.tVersion.nMajor == 1 and tData.tVersion.nMinor == 0 and tData.tVersion.nPatch <= 3) then
+			-- Mistakenly kept loglevel on DEBUG for version 1.0.0 -> 1.0.3
+			tData.sLogLevel = ktDefaultSettings.sLogLevel
 		end
 		
 		self.settings = mergeTables(self.settings, tData)
@@ -116,6 +115,7 @@ function TLoot:OnSlashCommand(strCommand, strParam)
 		elseif string.sub(strParam, 1, string.len("loglevel")) == "loglevel" then
 			self.settings.sLogLevel = string.upper(string.sub(strParam, string.len("loglevel") + 2))
 			Logger:SetLevel(self.settings.sLogLevel)
+			Print("[tLoot] logging level set to " .. self.settings.sLogLevel)
 			
 			return
 		end
@@ -145,6 +145,10 @@ function TLoot:OnDocLoaded()
 	
 	self.wndAnchor = Apollo.LoadForm(self.xmlDoc, "AnchorForm", nil, self)
 	self.wndAnchor:SetAnchorOffsets(unpack(self.settings.tAnchorOffsets))
+	if self.settings.bBottomToTop == true then
+		self.wndAnchor:FindChild("Anchor"):SetAnchorPoints(0, 0, 1, 0)
+		self.wndAnchor:FindChild("Anchor"):SetAnchorOffsets(0, -1, 0, 0)
+	end
 	self.wndAnchor:FindChild("Header"):Show(self.settings.bAnchorVisible)
 	
 	Apollo.RegisterSlashCommand("tLoot", "OnSlashCommand", self)
@@ -281,7 +285,7 @@ function TLoot:RemoveCompletedRolls()
 			wndItemContainer:Destroy()
 		end
 	end
-	wndAnchor:ArrangeChildrenVert()
+	self:ArrangeChildrenVert(wndAnchor)
 end
 
 function TLoot:ResizeAllBars(nWidth, nHeight)
@@ -302,7 +306,7 @@ function TLoot:ResizeAllBars(nWidth, nHeight)
 	for idx, child in ipairs(children) do
 		self:ResizeBar(child, nWidth, nHeight)
 	end
-	wndAnchor:ArrangeChildrenVert()
+	self:ArrangeChildrenVert(wndAnchor)
 end
 
 function TLoot:ResizeBar(wndItemContainer, nWidth, nHeight)
@@ -329,6 +333,16 @@ function TLoot:ResizeBar(wndItemContainer, nWidth, nHeight)
 	if wndBarFrame ~= nil then
 		local nLeft, nTop, nRight, nBottom = wndBarFrame:GetAnchorOffsets()
 		wndBarFrame:SetAnchorOffsets(nHeight - 4, nTop, nRight, nBottom)
+	end
+end
+
+function TLoot:ArrangeChildrenVert(wndContainer)
+	wndContainer:ArrangeChildrenVert()
+	if self.settings.bBottomToTop then
+		for idx, wndChild in ipairs(wndContainer:GetChildren()) do
+			local tOffsets = {wndChild:GetAnchorOffsets()}
+			wndChild:SetAnchorOffsets(tOffsets[1], -tOffsets[4], tOffsets[3], -tOffsets[2])
+		end
 	end
 end
 
@@ -400,7 +414,7 @@ function TLoot:DrawLoot(tLootRoll)
 		bFirstRun = true
 		wndItemContainer = Apollo.LoadForm(self.xmlDoc, "ItemForm", wndAnchor, self)
 		self:ResizeBar(wndItemContainer, self.settings.nBarWidth, self.settings.nBarHeight)
-		wndAnchor:ArrangeChildrenVert()
+		self:ArrangeChildrenVert(wndAnchor)
 		wndAnchor:EnsureChildVisible(wndItemContainer)
 		Sound.Play(Sound.PlayUIWindowNeedVsGreedOpen)
 	end
@@ -758,8 +772,8 @@ function TLoot:SetOptionValues()
 	self.wndOptionsList:FindChild("BarHeight"):FindChild("Slider"):SetValue(self.settings.nBarHeight)
 	self.wndOptionsList:FindChild("BarHeight"):FindChild("Value"):SetText(self.settings.nBarHeight)
 	
-	self.wndOptionsList:FindChild("Direction"):FindChild("UpBtn"):SetCheck(not self.settings.bBottomToTop)
-	self.wndOptionsList:FindChild("Direction"):FindChild("DownBtn"):SetCheck(self.settings.bBottomToTop)
+	self.wndOptionsList:FindChild("Direction"):FindChild("DownBtn"):SetCheck(not self.settings.bBottomToTop)
+	self.wndOptionsList:FindChild("Direction"):FindChild("UpBtn"):SetCheck(self.settings.bBottomToTop)
 	
 	self.wndOptionsList:FindChild("NeedKeybind"):FindChild("InputBox"):SetText(ktKeys[self.settings.nNeedKeybind])
 	self.wndOptionsList:FindChild("NeedKeybind"):FindChild("EnableBtn"):SetCheck(self.settings.bNeedKeybind)
@@ -806,6 +820,36 @@ function TLoot:OnBarHeightSliderChanged(wndHandler, wndControl, fNewValue, fOldV
 	
 	-- Update existing bars
 	self:ResizeAllBars(self.settings.nBarWidth, self.settings.nBarHeight)
+end
+
+function TLoot:OnBottomToTopDirectionCheck(wndHandler, wndControl, eMouseButton)
+	if wndHandler ~= wndControl then
+		return
+	end
+	
+	if self.settings.bBottomToTop == false and wndHandler:IsChecked() == true then
+		local wndAnchor = self.wndAnchor:FindChild("Anchor")
+		wndAnchor:FindChild("Anchor"):SetAnchorPoints(0, 0, 1, 0)
+		wndAnchor:SetAnchorOffsets(0, -1, 0, 0)
+		self:ArrangeChildrenVert(wndAnchor)
+	end
+	
+	self.settings.bBottomToTop = wndHandler:IsChecked()
+end
+
+function TLoot:OnTopToBottomDirectionCheck(wndHandler, wndControl, eMouseButton)
+	if wndHandler ~= wndControl then
+		return
+	end
+	
+	if self.settings.bBottomToTop == true and wndHandler:IsChecked() == true then
+		local wndAnchor = self.wndAnchor:FindChild("Anchor")
+		wndAnchor:SetAnchorPoints(0, 1, 1, 1)
+		wndAnchor:SetAnchorOffsets(0, 0, 0, 1)
+		self:ArrangeChildrenVert(wndAnchor)
+	end
+	
+	self.settings.bBottomToTop = not wndHandler:IsChecked()
 end
 
 function TLoot:OnReloadBtn(wndHandler, wndControl)
