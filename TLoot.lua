@@ -36,6 +36,7 @@ local ktDefaultSettings = {
 	bBottomToTop = false,
 	nNeedKeybind = 78, nGreedKeybind = 71, nPassKeybind = 80,
 	bNeedKeybind = true, bGreedKeybind = true, bPassKeybind = false,
+	bNameColorQuality = true,
 	sLogLevel = "ERROR"
 }
 
@@ -428,7 +429,8 @@ function TLoot:DrawLoot(tLootRoll)
 	if bFirstRun then
 		-- This stuff shouldn't change
 		wndItemContainer:FindChild("Name"):SetText(itemName)
-		wndItemContainer:FindChild("Name"):SetTextColor(itemQualityColor)
+		Logger:debug((self.settings.bNameColorQuality == true and itemQualityColor or "FFFFFFFF"))
+		wndItemContainer:FindChild("Name"):SetTextColor((self.settings.bNameColorQuality == true and itemQualityColor or "FFFFFFFF"))
 		wndItemContainer:FindChild("IconFrame"):SetBGColor(itemQualityColor)
 		wndItemContainer:FindChild("BarFrame"):SetBGColor(itemQualityColor)
 		wndItemContainer:FindChild("TimeRemainingBar"):SetBarColor(itemQualityColor)
@@ -775,6 +777,8 @@ function TLoot:SetOptionValues()
 	self.wndOptionsList:FindChild("Direction"):FindChild("DownBtn"):SetCheck(not self.settings.bBottomToTop)
 	self.wndOptionsList:FindChild("Direction"):FindChild("UpBtn"):SetCheck(self.settings.bBottomToTop)
 	
+	self.wndOptionsList:FindChild("NameColor"):FindChild("EnableBtn"):SetCheck(self.settings.bNameColorQuality)
+	
 	self.wndOptionsList:FindChild("NeedKeybind"):FindChild("InputBox"):SetText(ktKeys[self.settings.nNeedKeybind])
 	self.wndOptionsList:FindChild("NeedKeybind"):FindChild("EnableBtn"):SetCheck(self.settings.bNeedKeybind)
 	self.wndOptionsList:FindChild("GreedKeybind"):FindChild("InputBox"):SetText(ktKeys[self.settings.nGreedKeybind])
@@ -850,6 +854,14 @@ function TLoot:OnTopToBottomDirectionCheck(wndHandler, wndControl, eMouseButton)
 	end
 	
 	self.settings.bBottomToTop = not wndHandler:IsChecked()
+end
+
+function TLoot:OnNameColorQualityCheck(wndHandler, wndControl, eMouseButton)
+	if wndHandler ~= wndControl then
+		return
+	end
+	
+	self.settings.bNameColorQuality = wndHandler:IsChecked()
 end
 
 function TLoot:OnReloadBtn(wndHandler, wndControl)
