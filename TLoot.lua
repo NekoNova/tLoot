@@ -541,6 +541,13 @@ function TLoot:AddItemWinner(tItem, sWinner)
 	end
 end
 
+function TLoot:RemoveItemRollData(tItem)
+	local nId = tItem:GetItemId()
+	if self.tRollData and self.tRollData[nId] then
+		self.tRollData[nId] = nil
+	end
+end
+
 function TLoot:GetNeedOrGreedString(bNeed)
 	if bNeed then
 		return Apollo.GetString("NeedVsGreed_NeedRoll"), ktRollType["Need"]
@@ -561,6 +568,8 @@ function TLoot:OnLootRollAllPassed(tItem)
 		Logger:warn("Could not find loot window for item %s", tItem:GetName())
 	end
 	
+	self:RemoveItemRollData(tItem)
+	
 	ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Loot, String_GetWeaselString(Apollo.GetString("NeedVsGreed_EveryonePassed"), itemLooted:GetName()))
 end
 
@@ -577,6 +586,8 @@ function TLoot:OnLootRollWon(tItem, sWinner, bNeed)
 	else
 		Logger:warn("Could not find loot window for item %s", tItem:GetName())
 	end
+	
+	self:RemoveItemRollData(tItem)
 	
 	-- Example Message: Alvin used Greed Roll on Item Name for 45 (LootRoll).
 	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_ItemWon"), sWinner, tItem:GetName(), sNeedOrGreed))
@@ -980,7 +991,7 @@ function TLoot:GetTestItem()
 			if self.tCompletedRolls then
 				for id, tElement in pairs(self.tCompletedRolls) do
 					if tElement.itemDrop:GetItemId() == item:GetItemId() then
-						bFound = true
+						--bFound = true
 					end
 				end
 			end
@@ -988,6 +999,7 @@ function TLoot:GetTestItem()
 			if bFound then
 				item = nil
 			end
+			count = count + 1
 		end
 	end
 	
