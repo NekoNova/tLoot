@@ -37,6 +37,7 @@ local ktDefaultSettings = {
 	nNeedKeybind = 78, nGreedKeybind = 71, nPassKeybind = 80,
 	bNeedKeybind = true, bGreedKeybind = true, bPassKeybind = false,
 	bNameColorQuality = true,
+	bRollTypeMessages = true, bRollNumberMessages = true, bRollWinnerMessages = true,
 	sLogLevel = "ERROR"
 }
 
@@ -144,6 +145,7 @@ function TLoot:OnDocLoaded()
 	Apollo.StopTimer("LootUpdateTimer")
 	self.bTimerRunning = false
 	
+	Apollo.LoadSprites("TLootSprites.xml")
 	self.wndAnchor = Apollo.LoadForm(self.xmlDoc, "AnchorForm", nil, self)
 	self.wndAnchor:SetAnchorOffsets(unpack(self.settings.tAnchorOffsets))
 	if self.settings.bBottomToTop == true then
@@ -570,7 +572,9 @@ function TLoot:OnLootRollAllPassed(tItem)
 	
 	self:RemoveItemRollData(tItem)
 	
-	ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Loot, String_GetWeaselString(Apollo.GetString("NeedVsGreed_EveryonePassed"), itemLooted:GetName()))
+	if self.settings.bRollWinnerMessages == true then
+		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Loot, String_GetWeaselString(Apollo.GetString("NeedVsGreed_EveryonePassed"), itemLooted:GetName()))
+	end
 end
 
 function TLoot:OnLootRollWon(tItem, sWinner, bNeed)
@@ -589,8 +593,10 @@ function TLoot:OnLootRollWon(tItem, sWinner, bNeed)
 	
 	self:RemoveItemRollData(tItem)
 	
-	-- Example Message: Alvin used Greed Roll on Item Name for 45 (LootRoll).
-	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_ItemWon"), sWinner, tItem:GetName(), sNeedOrGreed))
+	if self.settings.bRollWinnerMessages == true then
+		-- Example Message: Alvin used Greed Roll on Item Name for 45 (LootRoll).
+		Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_ItemWon"), sWinner, tItem:GetName(), sNeedOrGreed))
+	end
 end
 
 function TLoot:OnLootRollSelected(tItem, sPlayer, bNeed)
@@ -599,8 +605,10 @@ function TLoot:OnLootRollSelected(tItem, sPlayer, bNeed)
 	
 	self:AddItemRollType(tItem, sPlayer, nRollType)
 	
-	-- Example Message: strPlayer has selected to bNeed for nLootItem
-	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_LootRollSelected"), sPlayer, sNeedOrGreed, tItem:GetName()))
+	if self.settings.bRollTypeMessages == true then
+		-- Example Message: strPlayer has selected to bNeed for nLootItem
+		Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_LootRollSelected"), sPlayer, sNeedOrGreed, tItem:GetName()))
+	end
 end
 
 function TLoot:OnLootRollPassed(tItem, sPlayer)
@@ -608,8 +616,10 @@ function TLoot:OnLootRollPassed(tItem, sPlayer)
 	
 	self:AddItemRollType(tItem, sPlayer, ktRollType["Pass"])
 	
-	-- Example Message: strPlayer passed on nLootItem
-	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_PlayerPassed"), sPlayer, tItem:GetName()))
+	if self.settings.bRollTypeMessages == true then
+		-- Example Message: strPlayer passed on nLootItem
+		Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_PlayerPassed"), sPlayer, tItem:GetName()))
+	end
 end
 
 function TLoot:OnLootRoll(tItem, sPlayer, nRoll, bNeed)
@@ -618,8 +628,10 @@ function TLoot:OnLootRoll(tItem, sPlayer, nRoll, bNeed)
 	
 	self:AddItemRoll(tItem, sPlayer, nRoll)
 	
-	-- Example String: strPlayer rolled nRoll for nLootItem (bNeed)
-	Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_OnLootRoll"), sPlayer, nRoll, tItem:GetName(), sNeedOrGreed ))
+	if self.settings.bRollNumberMessages == true then
+		-- Example String: strPlayer rolled nRoll for nLootItem (bNeed)
+		Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_OnLootRoll"), sPlayer, nRoll, tItem:GetName(), sNeedOrGreed ))
+	end
 end
 
 -----------------------------------------------------------------------------------------------
@@ -790,6 +802,10 @@ function TLoot:SetOptionValues()
 	
 	self.wndOptionsList:FindChild("NameColor"):FindChild("EnableBtn"):SetCheck(self.settings.bNameColorQuality)
 	
+	self.wndOptionsList:FindChild("RollTypeMessages"):FindChild("EnableBtn"):SetCheck(self.settings.bRollTypeMessages)
+	self.wndOptionsList:FindChild("RollNumberMessages"):FindChild("EnableBtn"):SetCheck(self.settings.bRollNumberMessages)
+	self.wndOptionsList:FindChild("RollWinnerMessages"):FindChild("EnableBtn"):SetCheck(self.settings.bRollWinnerMessages)
+	
 	self.wndOptionsList:FindChild("NeedKeybind"):FindChild("InputBox"):SetText(ktKeys[self.settings.nNeedKeybind])
 	self.wndOptionsList:FindChild("NeedKeybind"):FindChild("EnableBtn"):SetCheck(self.settings.bNeedKeybind)
 	self.wndOptionsList:FindChild("GreedKeybind"):FindChild("InputBox"):SetText(ktKeys[self.settings.nGreedKeybind])
@@ -873,6 +889,30 @@ function TLoot:OnNameColorQualityCheck(wndHandler, wndControl, eMouseButton)
 	end
 	
 	self.settings.bNameColorQuality = wndHandler:IsChecked()
+end
+
+function TLoot:OnRollTypeMessageCheck(wndHandler, wndControl, eMouseButton)
+	if wndHandler ~= wndControl then
+		return
+	end
+	
+	self.settings.bRollTypeMessages = wndHandler:IsChecked()
+end
+
+function TLoot:OnRollNumberMessageCheck(wndHandler, wndControl, eMouseButton)
+	if wndHandler ~= wndControl then
+		return
+	end
+	
+	self.settings.bRollNumberMessages = wndHandler:IsChecked()
+end
+
+function TLoot:OnRollWinnerMessageCheck(wndHandler, wndControl, eMouseButton)
+	if wndHandler ~= wndControl then
+		return
+	end
+	
+	self.settings.bRollWinnerMessages = wndHandler:IsChecked()
 end
 
 function TLoot:OnReloadBtn(wndHandler, wndControl)
