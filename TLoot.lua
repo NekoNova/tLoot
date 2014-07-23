@@ -152,7 +152,7 @@ function TLoot:OnDocLoaded()
 		self.wndAnchor:FindChild("Anchor"):SetAnchorPoints(0, 0, 1, 0)
 		self.wndAnchor:FindChild("Anchor"):SetAnchorOffsets(0, -1, 0, 0)
 	end
-	self.wndAnchor:FindChild("Header"):Show(self.settings.bAnchorVisible)
+	self:UpdateAnchorVisibility()
 	
 	Apollo.RegisterSlashCommand("tLoot", "OnSlashCommand", self)
 	Apollo.RegisterSlashCommand("tloot", "OnSlashCommand", self)
@@ -179,6 +179,12 @@ end
 function TLoot:ToggleAnchor()
 	if self.wndAnchor then
 		self.settings.bAnchorVisible = not self.settings.bAnchorVisible
+		self:UpdateAnchorVisibility()
+	end
+end
+
+function TLoot:UpdateAnchorVisibility()
+	if self.wndAnchor then
 		self.wndAnchor:FindChild("Header"):Show(self.settings.bAnchorVisible)
 		self.wndAnchor:SetStyle("IgnoreMouse", not self.settings.bAnchorVisible)
 		self.wndAnchor:SetStyle("Moveable", self.settings.bAnchorVisible)
