@@ -1,0 +1,9 @@
+externals:
+	GeminiAddon:
+ 		url: https://github.com/wildstarnasa/GeminiAddon.git
+ 	GeminiLogging:
+		url: https://github.com/wildstarnasa/GeminiLogging.git
+package-as: tLoot
+license-output: LICENSE
+ignore:
+	- README.md
