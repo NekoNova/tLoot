@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="Toez" APIVersion="9" Name="TLoot" Description="Loot roll replacement" Version="">
-    <!-- Libraries -->
+<Addon Author="Toez & Olivar Nax" APIVersion="11" Name="TLoot" Description="Loot roll replacement" Version="2.0.0">
     <Script Name="GeminiAddon\GeminiAddon.lua"/>
     <Script Name="GeminiLogging\GeminiLogging.lua"/>
     <Script Name="TLoot.lua"/>

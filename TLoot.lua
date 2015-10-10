@@ -2,7 +2,6 @@
 -- Client Lua Script for TLoot
 -- Copyright (c) NCsoft. All rights reserved
 -----------------------------------------------------------------------------------------------
-
 require "os"
 require "Window"
 require "Sound"
@@ -10,53 +9,60 @@ require "Sound"
 -----------------------------------------------------------------------------------------------
 -- TLoot Module Definition
 -----------------------------------------------------------------------------------------------
-local NAME = "tLoot"
-
-local TLoot = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(NAME, false, {"Gemini:Logging-1.2"})
-
+local strName = "tLoot"
+local bConfigure = false
+local tDependencies = {
+  "Gemini:Logging-1.2"
+}
+local TLoot = {}
 local Logger
  
+-- Register our Addon using the GeminiAddon:NewAddon method.
+TLoot = Apollo.GetPackage("Gemini:Addon-1.1").tPackage:NewAddon(strName, bConfigure, tDependencies)
+
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
-local ktVersion = {nMajor = 1, nMinor = 1, nPatch = 2}
-
+local ktVersion = { nMajor = 2, nMinor = 0, nPatch = 0 }
 local ktDefaultSettings = {
 	tVersion = {
 		nMajor = ktVersion.nMajor,
 		nMinor = ktVersion.nMinor,
 		nPatch = ktVersion.nPatch
 	},
-	tAnchorOffsets = {5, 446, 300, 480},
+	tAnchorOffsets = { 5, 446, 300, 480 },
 	tOptionsWindowPos = {},
 	bAnchorVisible = true,
 	nBarUpdateSpeed = 0.5,
 	nBarHeight = 34,
 	nBarWidth = 295,
 	bBottomToTop = false,
-	nNeedKeybind = 78, nGreedKeybind = 71, nPassKeybind = 80,
-	bNeedKeybind = true, bGreedKeybind = true, bPassKeybind = false,
+	nNeedKeybind = 78, 
+	nGreedKeybind = 71, 
+	nPassKeybind = 80,
+	bNeedKeybind = true,
+	bGreedKeybind = true,
+	bPassKeybind = false,
 	bNameColorQuality = true,
-	bRollTypeMessages = true, bRollNumberMessages = true, bRollWinnerMessages = true,
+	bRollTypeMessages = true,
+	bRollNumberMessages = true,
+	bRollWinnerMessages = true,
 	sLogLevel = "ERROR"
 }
-
 local ktEvalColors = {
-	[Item.CodeEnumItemQuality.Inferior] 		= ApolloColor.new("ItemQuality_Inferior"),
-	[Item.CodeEnumItemQuality.Average] 			= ApolloColor.new("ItemQuality_Average"),
-	[Item.CodeEnumItemQuality.Good] 			= ApolloColor.new("ItemQuality_Good"),
-	[Item.CodeEnumItemQuality.Excellent] 		= ApolloColor.new("ItemQuality_Excellent"),
-	[Item.CodeEnumItemQuality.Superb] 			= ApolloColor.new("ItemQuality_Superb"),
-	[Item.CodeEnumItemQuality.Legendary] 		= ApolloColor.new("ItemQuality_Legendary"),
-	[Item.CodeEnumItemQuality.Artifact]		 	= ApolloColor.new("ItemQuality_Artifact")
+	[Item.CodeEnumItemQuality.Inferior] = ApolloColor.new("ItemQuality_Inferior"),
+	[Item.CodeEnumItemQuality.Average] = ApolloColor.new("ItemQuality_Average"),
+	[Item.CodeEnumItemQuality.Good] = ApolloColor.new("ItemQuality_Good"),
+	[Item.CodeEnumItemQuality.Excellent] = ApolloColor.new("ItemQuality_Excellent"),
+	[Item.CodeEnumItemQuality.Superb] = ApolloColor.new("ItemQuality_Superb"),
+	[Item.CodeEnumItemQuality.Legendary] = ApolloColor.new("ItemQuality_Legendary"),
+	[Item.CodeEnumItemQuality.Artifact]	= ApolloColor.new("ItemQuality_Artifact")
 }
-
 local ktRollType = {
 	["Need"] = 1,
 	["Greed"] = 2,
 	["Pass"] = 3
 }
-
 local ktKeys = {
 	[65] = "A", [66] = "B", [67] = "C", [68] = "D", [69] = "E", [70] = "F", [71] = "G", [72] = "H", [73] = "I", [74] = "J", [75] = "K", [76] = "L", [77] = "M",
 	[78] = "N", [79] = "O", [80] = "P", [81] = "Q", [82] = "R", [83] = "S", [84] = "T", [85] = "U", [86] = "V", [87] = "W", [88] = "X", [89] = "Y", [90] = "Z",
@@ -68,17 +74,18 @@ local ktKeys = {
 -----------------------------------------------------------------------------------------------
 function TLoot:OnInitialize()
 	local GeminiLogging = Apollo.GetPackage("Gemini:Logging-1.2").tPackage
+	
 	Logger = GeminiLogging:GetLogger({
 		level = GeminiLogging.ERROR,
 		pattern = "%d [%c:%n] %l - %m",
 		appender = "GeminiConsole"
 	})
+	
 	Logger:debug("Logger Initialized")
 	
 	self.settings = copyTable(ktDefaultSettings)
 	self.nTestLootId = 1
 	self.nTestItemId = 1
-	
 	self.xmlDoc = XmlDoc.CreateFromFile("TLoot.xml")
 	self.xmlDoc:RegisterCallback("OnDocLoaded", self)
 end
@@ -87,6 +94,7 @@ function TLoot:OnSave(eLevel)
 	if (eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character) then
 		return
 	end
+	
 	Logger:debug("OnSaveSettings")
 	
 	self.settings.tVersion = copyTable(ktVersion)
@@ -110,54 +118,61 @@ end
 function TLoot:OnSlashCommand(strCommand, strParam)
 	if strParam then
 		if strParam == "options" then
-			self:ToggleOptionsWindow()
-			
+			self:ToggleOptionsWindow()			
 			return
 		elseif string.sub(strParam, 1, string.len("loglevel")) == "loglevel" then
 			self.settings.sLogLevel = string.upper(string.sub(strParam, string.len("loglevel") + 2))
 			Logger:SetLevel(self.settings.sLogLevel)
-			Print("[tLoot] logging level set to " .. self.settings.sLogLevel)
-			
+			Print("[tLoot] logging level set to " .. self.settings.sLogLevel)			
 			return
 		end
 	end
+	
 	self:ToggleAnchor()
 end
 
 function TLoot:OnDocLoaded()
 	Logger:debug("OnDocLoaded (loaded = %s)", tostring(self.xmlDoc:IsLoaded()))
+	
 	if self.xmlDoc == nil and self.xmlDoc:IsLoaded() then
 		Logger:error("Document not Loaded")
 		return
 	end
 	
-	Apollo.RegisterEventHandler("LootRollUpdate",		"OnGroupLoot", self)
-    Apollo.RegisterTimerHandler("LootUpdateTimer", 		"OnUpdateTimer", self)
-    Apollo.RegisterEventHandler("LootRollWon", 			"OnLootRollWon", self)
-    Apollo.RegisterEventHandler("LootRollAllPassed", 	"OnLootRollAllPassed", self)
-	
-	Apollo.RegisterEventHandler("LootRollSelected", 	"OnLootRollSelected", self)
-	Apollo.RegisterEventHandler("LootRollPassed", 		"OnLootRollPassed", self)
-	Apollo.RegisterEventHandler("LootRoll", 			"OnLootRoll", self)
-	
+	-- Register our eventHandler for the various LootRoll Events
+	Apollo.RegisterEventHandler("LootRollUpdate", "OnGroupLoot", self)
+  Apollo.RegisterTimerHandler("LootUpdateTimer", "OnUpdateTimer", self)
+  Apollo.RegisterEventHandler("LootRollWon", "OnLootRollWon", self)
+  Apollo.RegisterEventHandler("LootRollAllPassed", "OnLootRollAllPassed", self)
+	Apollo.RegisterEventHandler("LootRollSelected", "OnLootRollSelected", self)
+	Apollo.RegisterEventHandler("LootRollPassed", "OnLootRollPassed", self)
+	Apollo.RegisterEventHandler("LootRoll", "OnLootRoll", self)
+
+  -- Create a timer to keep track of the time remaining for looting.	
 	Apollo.CreateTimer("LootUpdateTimer", self.settings.nBarUpdateSpeed, false)
 	Apollo.StopTimer("LootUpdateTimer")
 	self.bTimerRunning = false
 	
+	-- Load our custom sprites and configure the windows.
 	Apollo.LoadSprites("TLootSprites.xml")
+	
 	self.wndAnchor = Apollo.LoadForm(self.xmlDoc, "AnchorForm", nil, self)
 	self.wndAnchor:SetAnchorOffsets(unpack(self.settings.tAnchorOffsets))
+	
 	if self.settings.bBottomToTop == true then
 		self.wndAnchor:FindChild("Anchor"):SetAnchorPoints(0, 0, 1, 0)
 		self.wndAnchor:FindChild("Anchor"):SetAnchorOffsets(0, -1, 0, 0)
 	end
+	
 	self:UpdateAnchorVisibility()
 	
+	-- Register the various slash commands we are listening on.
 	Apollo.RegisterSlashCommand("tLoot", "OnSlashCommand", self)
 	Apollo.RegisterSlashCommand("tloot", "OnSlashCommand", self)
 	Apollo.RegisterSlashCommand("TLoot", "OnSlashCommand", self)
 	Apollo.RegisterSlashCommand("tl", "OnSlashCommand", self)
 	
+	-- Hook in on the SystemKeyDown event, to capture keypresses.
 	Apollo.RegisterEventHandler("SystemKeyDown", "OnSystemKeyDown", self)
 	
 	self.tLootRolls = nil
