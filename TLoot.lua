@@ -81,7 +81,7 @@ function TLoot:OnInitialize()
 		appender = "GeminiConsole"
 	})
 	
-	Logger:debug("Logger Initialized")
+	Print("Logger Initialized")
 	
 	self.settings = copyTable(ktDefaultSettings)
 	self.nTestLootId = 1
@@ -95,7 +95,7 @@ function TLoot:OnSave(eLevel)
 		return
 	end
 	
-	Logger:debug("OnSaveSettings")
+	Print("OnSaveSettings")
 	
 	self.settings.tVersion = copyTable(ktVersion)
 	
@@ -133,7 +133,7 @@ end
 
 function TLoot:OnDocLoaded()
 	Logger:debug("OnDocLoaded (loaded = %s)", tostring(self.xmlDoc:IsLoaded()))
-	
+
 	if self.xmlDoc == nil and self.xmlDoc:IsLoaded() then
 		Logger:error("Document not Loaded")
 		return
@@ -141,16 +141,14 @@ function TLoot:OnDocLoaded()
 	
 	-- Register our eventHandler for the various LootRoll Events
 	Apollo.RegisterEventHandler("LootRollUpdate", "OnGroupLoot", self)
-  Apollo.RegisterTimerHandler("LootUpdateTimer", "OnUpdateTimer", self)
-  Apollo.RegisterEventHandler("LootRollWon", "OnLootRollWon", self)
-  Apollo.RegisterEventHandler("LootRollAllPassed", "OnLootRollAllPassed", self)
+  	Apollo.RegisterEventHandler("LootRollWon", "OnLootRollWon", self)
+  	Apollo.RegisterEventHandler("LootRollAllPassed", "OnLootRollAllPassed", self)
 	Apollo.RegisterEventHandler("LootRollSelected", "OnLootRollSelected", self)
 	Apollo.RegisterEventHandler("LootRollPassed", "OnLootRollPassed", self)
 	Apollo.RegisterEventHandler("LootRoll", "OnLootRoll", self)
 
-  -- Create a timer to keep track of the time remaining for looting.	
-	Apollo.CreateTimer("LootUpdateTimer", self.settings.nBarUpdateSpeed, false)
-	Apollo.StopTimer("LootUpdateTimer")
+  	-- Create a timer to keep track of the time remaining for looting.
+	self.tmrLootUpdate = ApolloTimer.Create(self.settings.nBarUpdateSpeed, false, "OnUpdateTimer", self)
 	self.bTimerRunning = false
 	
 	-- Load our custom sprites and configure the windows.
@@ -218,6 +216,7 @@ end
 function TLoot:GetLootRolls()
 	local tAllLootRolls = {}
 	local tRealLootRolls = GameLib.GetLootRolls()
+
 	if tRealLootRolls then
 		for idx, tItem in ipairs(tRealLootRolls) do
 			if not self.tLootMaxTimes[tItem.nLootId] or self.tLootMaxTimes[tItem.nLootId] < tItem.nTimeLeft then
@@ -226,6 +225,7 @@ function TLoot:GetLootRolls()
 			table.insert(tAllLootRolls, tItem)
 		end
 	end
+
 	if self.tTestRolls then
 		for id, tItem in pairs(self.tTestRolls) do
 			if not self.tLootMaxTimes[tItem.nLootId] or self.tLootMaxTimes[tItem.nLootId] < tItem.nTimeLeft then
@@ -260,8 +260,9 @@ end
 
 function TLoot:GetLootWindowForRoll(tLootRoll)
 	local wndAnchor = self.wndAnchor:FindChild("Anchor")
-	local wndItemContainer = nil
-	for idx, wndChild in ipairs(wndAnchor:GetChildren()) do
+	local wndItemContainer
+
+    for idx, wndChild in ipairs(wndAnchor:GetChildren()) do
 		local data = wndChild:GetData()
 		
 		if data and data.nLootId and tLootRoll.nLootId == data.nLootId then
@@ -270,14 +271,16 @@ function TLoot:GetLootWindowForRoll(tLootRoll)
 			end
 			wndItemContainer = wndChild
 		end
-	end
+    end
+
 	return wndItemContainer
 end
 
 function TLoot:GetLootWindowForItem(tItem)
 	local wndAnchor = self.wndAnchor:FindChild("Anchor")
-	local wndItemContainer = nil
-	for idx, wndChild in ipairs(wndAnchor:GetChildren()) do
+	local wndItemContainer
+
+    for idx, wndChild in ipairs(wndAnchor:GetChildren()) do
 		local data = wndChild:GetData()
 		
 		if data and data.itemDrop and data.itemDrop:GetName() == tItem:GetName() then
@@ -286,7 +289,8 @@ function TLoot:GetLootWindowForItem(tItem)
 			end
 			wndItemContainer = wndChild
 		end
-	end
+    end
+
 	return wndItemContainer
 end
 
@@ -374,8 +378,9 @@ end
 -----------------------------------------------------------------------------------------------
 function TLoot:OnGroupLoot()
 	Logger:debug("OnGroupLoot (running = %s)", tostring(self.bTimerRunning))
+
 	if not self.bTimerRunning then
-		Apollo.StartTimer("LootUpdateTimer")
+		self.tmrLootUpdate:Start()
 		self.bTimerRunning = true
 	end
 end
@@ -404,6 +409,7 @@ function TLoot:OnUpdateTimer()
 	self:CountDownTestRolls()
 	
 	Logger:debug("OnUpdateTimer (%s rolls)", (self.tKnownLoot and tostring(#self.tKnownLoot) or "0"))
+
 	if self.tKnownLoot then
 		for nLootId, tLootRoll in pairs(self.tKnownLoot) do
 			self:DrawLoot(tLootRoll)
@@ -414,7 +420,7 @@ function TLoot:OnUpdateTimer()
 
 	if self.tLootRolls and #self.tLootRolls > 0 then
 		Logger:debug("Restarting Timer")
-		Apollo.StartTimer("LootUpdateTimer")
+		self.tmrLootUpdate:Start()
 	else
 		Logger:debug("Timer Stopped")
 		self.bTimerRunning = false
@@ -423,6 +429,7 @@ end
 
 function TLoot:DrawLoot(tLootRoll)
 	Logger:debug("DrawLoot")
+
 	if not self.wndAnchor or not self.wndAnchor:IsValid() then
 		Logger:error("Anchor doesn't exist or is not valid")
 		return
@@ -534,6 +541,7 @@ end
 -----------------------------------------------------------------------------------------------
 function TLoot:AddItemRollType(tItem, sPlayer, nRollType)
 	local nId = tItem:GetItemId()
+
 	if not self.tRollData[nId] then
 		self.tRollData[nId] = {
 			players = {},
@@ -579,78 +587,110 @@ function TLoot:GetNeedOrGreedString(bNeed)
 end
 
 function TLoot:OnLootRollAllPassed(tItem)
-	Logger:debug("OnLootRollAllPassed (%s)", tItem:GetName())
+    local itemLoot = tItem.itemLoot
+
+	Logger:debug("OnLootRollAllPassed (%s)", itemLoot:GetName())
 	
-	local wndItemContainer = self:GetLootWindowForItem(tItem)
+	local wndItemContainer = self:GetLootWindowForItem(itemLoot)
+
 	if wndItemContainer ~= nil then
 		local data = wndItemContainer:GetData()
 		data.nTimeCompleted = os.clock()
 		wndItemContainer:SetData(data)
 	else
-		Logger:warn("Could not find loot window for item %s", tItem:GetName())
+		Logger:warn("Could not find loot window for item %s", itemLoot:GetName())
 	end
 	
-	self:RemoveItemRollData(tItem)
+	self:RemoveItemRollData(itemLoot)
 	
 	if self.settings.bRollWinnerMessages == true then
-		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Loot, String_GetWeaselString(Apollo.GetString("NeedVsGreed_EveryonePassed"), itemLooted:GetName()))
+		ChatSystemLib.PostOnChannel(ChatSystemLib.ChatChannel_Loot, String_GetWeaselString(Apollo.GetString("NeedVsGreed_EveryonePassed"), itemLoot:GetName()))
 	end
 end
 
-function TLoot:OnLootRollWon(tItem, sWinner, bNeed)
-	Logger:debug("OnLootRollWon (i=%s, w=%s, n=%s)", tItem:GetName(), sWinner, tostring(bNeed))
-	local sNeedOrGreed = self:GetNeedOrGreedString(bNeed)
+-- This event changed in API 12
+-- This event now only has the tItem parameter with the following keys: itemLoot, strPlayer, nLootId, bNeed
+--
+function TLoot:OnLootRollWon(tItem)
+    local itemLoot = tItem.itemLoot
+    local strPlayer = tItem.strPlayer
+    local nLootId = tItem.nLootId
+    local bNeed = tItem.bNeed
+
+    Logger:debug("OnLootRollWon (i=%s, w=%s, n=%s)", itemLoot:GetName(), strPlayer, tostring(bNeed))
+    local sNeedOrGreed = self:GetNeedOrGreedString(bNeed)
 	
-	self:AddItemWinner(tItem, sWinner)
-	local wndItemContainer = self:GetLootWindowForItem(tItem)
+	self:AddItemWinner(itemLoot, strPlayer)
+	local wndItemContainer = self:GetLootWindowForItem(itemLoot)
 	if wndItemContainer ~= nil then
 		local data = wndItemContainer:GetData()
 		data.nTimeCompleted = os.clock()
 		wndItemContainer:SetData(data)
 	else
-		Logger:warn("Could not find loot window for item %s", tItem:GetName())
+		Logger:warn("Could not find loot window for item %s", itemLoot:GetName())
 	end
 	
-	self:RemoveItemRollData(tItem)
+	self:RemoveItemRollData(itemLoot)
 	
 	if self.settings.bRollWinnerMessages == true then
 		-- Example Message: Alvin used Greed Roll on Item Name for 45 (LootRoll).
-		Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_ItemWon"), sWinner, tItem:GetName(), sNeedOrGreed))
+		Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_ItemWon"), strPlayer, itemLoot:GetName(), sNeedOrGreed))
 	end
 end
 
-function TLoot:OnLootRollSelected(tItem, sPlayer, bNeed)
-	Logger:debug("OnLootRollSelected (i=%s, p=%s, n=%s)", tItem:GetName(), sPlayer, tostring(bNeed))
+-- This event changed in API 12.
+-- The event now only receives a table with the following keys:
+--      itemLoot, nLootId, strPlayer, bNeed
+--
+function TLoot:OnLootRollSelected(tItem)
+    local itemLoot = tItem.itemLoot
+    local strPlayer = tItem.strPlayer
+    local nLootId = tItem.nLootId
+    local bNeed = tItem.bNeed
+
+    Logger:debug("OnLootRollSelected (i=%s, p=%s, n=%s)", itemLoot:GetName(), strPlayer, tostring(bNeed))
+    local sNeedOrGreed, nRollType = self:GetNeedOrGreedString(bNeed)
+
+    self:AddItemRollType(itemLoot, strPlayer, nRollType)
+
+    if self.settings.bRollTypeMessages == true then
+        -- Example Message: strPlayer has selected to bNeed for nLootItem
+        Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_LootRollSelected"), strPlayer, sNeedOrGreed, itemLoot:GetName()))
+    end
+end
+
+function TLoot:OnLootRollPassed(tItem)
+    local itemLoot = tItem.itemLoot
+    local strPlayer = tItem.strPlayer
+    local bNeed = tItem.bNeed
+    local nLootId = tItem.nLootId
+
+    Logger:debug("OnLootRollPassed (i=%s, p=%s)", itemLoot:GetName(), strPlayer)
+
+    self:AddItemRollType(itemLoot, strPlayer, ktRollType["Pass"])
+
+    if self.settings.bRollTypeMessages == true then
+        -- Example Message: strPlayer passed on nLootItem
+        Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_PlayerPassed"), strPlayer, itemLoot:GetName()))
+    end
+end
+
+-- Changed in API 12
+-- Now receives a table with the following keys: nLootId, itemLoot, bNeed, strPlayer, nRoll
+function TLoot:OnLootRoll(tItem)
+    local itemLoot = tItem.itemLoot
+    local strPlayer = tItem.strPlayer
+    local bNeed = tItem.bNeed
+    local nLootId = tItem.nLootId
+    local nRoll = tItem.nRoll
+
+	Logger:debug("OnLootRoll (i=%s, p=%s, r=%s, n=%s)", itemLoot:GetName(), strPlayer, tostring(nRoll), tostring(bNeed))
 	local sNeedOrGreed, nRollType = self:GetNeedOrGreedString(bNeed)
-	
-	self:AddItemRollType(tItem, sPlayer, nRollType)
-	
-	if self.settings.bRollTypeMessages == true then
-		-- Example Message: strPlayer has selected to bNeed for nLootItem
-		Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_LootRollSelected"), sPlayer, sNeedOrGreed, tItem:GetName()))
-	end
-end
 
-function TLoot:OnLootRollPassed(tItem, sPlayer)
-	Logger:debug("OnLootRollPassed (i=%s, p=%s)", tItem:GetName(), sPlayer)
-	
-	self:AddItemRollType(tItem, sPlayer, ktRollType["Pass"])
-	
-	if self.settings.bRollTypeMessages == true then
-		-- Example Message: strPlayer passed on nLootItem
-		Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_PlayerPassed"), sPlayer, tItem:GetName()))
-	end
-end
-
-function TLoot:OnLootRoll(tItem, sPlayer, nRoll, bNeed)
-	Logger:debug("OnLootRoll (i=%s, p=%s, r=%s, n=%s)", tItem:GetName(), sPlayer, tostring(nRoll), tostring(bNeed))
-	local sNeedOrGreed, nRollType = self:GetNeedOrGreedString(bNeed)
-	
-	self:AddItemRoll(tItem, sPlayer, nRoll)
+	self:AddItemRoll(itemLoot, strPlayer, nRoll)
 	
 	if self.settings.bRollNumberMessages == true then
-		-- Example String: strPlayer rolled nRoll for nLootItem (bNeed)
-		Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_OnLootRoll"), sPlayer, nRoll, tItem:GetName(), sNeedOrGreed ))
+		Event_FireGenericEvent("GenericEvent_LootChannelMessage", String_GetWeaselString(Apollo.GetString("NeedVsGreed_OnLootRoll"), strPlayer, nRoll, itemLoot:GetName(), sNeedOrGreed ))
 	end
 end
 
@@ -843,9 +883,12 @@ function TLoot:OnBarUpdateSpeedSliderChanged(wndHandler, wndControl, fNewValue, 
 	wndControl:GetParent():GetParent():FindChild("Value"):SetText(self.settings.nBarUpdateSpeed)
 	
 	-- Update timer
-	Apollo.CreateTimer("LootUpdateTimer", self.settings.nBarUpdateSpeed, false)
-	if not self.bTimerRunning then
-		Apollo.StopTimer("LootUpdateTimer")
+	self.tmrLootUpdate = ApolloTimer.Create(self.settings.nBarUpdateSpeed, false, "OnUpdateTimer", self)
+
+    if not self.bTimerRunning then
+		self.tmrLootUpdate:Stop()
+    else
+        self.tmrLootUpdate:Start()
 	end
 end
 
@@ -1032,7 +1075,7 @@ end
 -- Returns a random equipped item, or a template one if nil
 function TLoot:GetTestItem()
 	local unitPlayer = GameLib.GetPlayerUnit()
-	local item = nil
+	local item
 	if unitPlayer ~= nil then
 		local count = 0
 		local tItems = unitPlayer:GetEquippedItems()
